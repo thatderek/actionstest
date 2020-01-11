@@ -1,0 +1,53 @@
+name: PR to Master
+
+on: 
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    container: 
+      image: docker://golang:1.13.1-alpine
+    name: PR Tests
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup Build Environment
+        env:
+          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+        run: |
+          apk add --no-cache bash curl jq
+          mkdir --parents /go/src/${GITHUB_REPOSITORY}
+          rm -rf /go/src/${GITHUB_REPOSITORY}
+          ln -s `pwd` /go/src/${GITHUB_REPOSITORY}
+      - name: Build Binary
+        run: |
+          ln -s `pwd` /go/src/
+          go install
+      - name: Validate Version
+        env: 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+        shell: bash
+        run: |
+          # Uses binary built in prior step
+          APP=${PWD##*/}
+          RELEASE_TAG=$($APP version)
+
+          AUTH_HEADER="Authorization: token ${GITHUB_TOKEN}"
+          RELEASE_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+          
+          echo "Looking for: ${RELEASE_URL}"
+
+          RESULT=`curl \
+            -s \
+            -H "${AUTH_HEADER}" \
+            "${RELEASE_URL}"`
+
+          echo $RESULT
+
+          if ! `echo $RESULT | jq '.message' | grep -q 'Not Found'`; then
+            echo "Fail: Release name '$RELEASE_TAG\ already exists; did you increment version number?"
+            exit 1
+          fi

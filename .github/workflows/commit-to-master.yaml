@@ -1,0 +1,26 @@
+name: Master Commit
+
+on: 
+  push:
+    branches:
+      - master
+
+jobs:
+  make_release:
+    runs-on: ubuntu-latest
+    container: 
+      image: docker://golang:1.13.1-alpine
+    name: Make Release
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup Build Environment
+        run: |
+          apk add --no-cache zip bash curl jq
+      - name: Build
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: $GITHUB_REPOSITORY
+          GITHUB_EVENT_PATH: $GITHUB_EVENT_PATH
+        run: |
+          echo $GITHUB_REPOSITORY
+          cat $GITHUB_EVENT_PATH | jq
